@@ -138,6 +138,95 @@ def carry_over_unfinished(from_date: date, to_date: date) -> int:
             conn.execute("UPDATE tasks SET status = 'carried' WHERE id = ?", (task["id"],))
         return len(pending)
 
+def get_task_by_id(task_id: int):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+
+def get_user():
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+
+
+def log_checkin(task_id: int, response: str) -> int:
+    """Log a check-in response. Returns updated checkin_count."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO checkins (task_id, response, responded_at) VALUES (?, ?, datetime('now'))",
+            (task_id, response))
+        conn.execute(
+            "UPDATE tasks SET checkin_count = checkin_count + 1 WHERE id = ?", (task_id,))
+        row = conn.execute(
+            "SELECT checkin_count FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return row["checkin_count"] if row else 0
+
+
+def suppress_checkins(task_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE tasks SET next_checkin_at = 'suppressed' WHERE id = ?", (task_id,))
+
+
+def set_task_category(task_id: int, category: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE tasks SET ai_category = ? WHERE id = ?", (category, task_id))
+
+
+def count_days_carried(task_id: int) -> int:
+    """Count how many days a task has been carried (follow the chain)."""
+    with get_conn() as conn:
+        count = 0
+        current_id = task_id
+        seen = set()
+        while current_id and current_id not in seen:
+            seen.add(current_id)
+            row = conn.execute(
+                "SELECT carried_from_id FROM tasks WHERE id = ?", (current_id,)
+            ).fetchone()
+            if not row or not row["carried_from_id"]:
+                break
+            current_id = row["carried_from_id"]
+            count += 1
+        return count
+
+
+def get_tasks_in_range(start: date, end: date) -> list:
+    """Return all tasks between start and end dates inclusive."""
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT * FROM tasks
+            WHERE date BETWEEN ? AND ?
+            ORDER BY date ASC, position ASC
+        """, (start.isoformat(), end.isoformat())).fetchall()
+
+
+def get_journal_entries_in_range(start: date, end: date) -> list:
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT * FROM journal_entries
+            WHERE date(created_at) BETWEEN ? AND ?
+            ORDER BY created_at ASC
+        """, (start.isoformat(), end.isoformat())).fetchall()
+
+
+def save_report(period: str, start: date, end: date, content: str) -> int:
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO reports (period, start_date, end_date, content)
+            VALUES (?, ?, ?, ?)
+        """, (period, start.isoformat(), end.isoformat(), content))
+        return cur.lastrowid
+
+
+def get_latest_report(period: str) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT * FROM reports WHERE period = ?
+            ORDER BY generated_at DESC LIMIT 1
+        """, (period,)).fetchone()
+
+
 def add_journal_entry(text: str) -> int:
     with get_conn() as conn:
         cur = conn.execute("INSERT INTO journal_entries (text) VALUES (?)", (text,))

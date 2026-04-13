@@ -101,11 +101,72 @@ async def add_receive_why(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         why_lines = [l.strip() for l in raw.splitlines() if l.strip()]
         for i in range(min(3, len(why_lines))):
             whys[i] = why_lines[i] or None
+
+    # AI evaluation — runs before saving so we can show feedback
+    await update.message.reply_text("Analysing your tasks… ⚡", parse_mode="Markdown")
+    from jacbot import ai
+    evaluations = ai.evaluate_tasks(tasks, whys)
+
+    # Build feedback message
+    feedback_lines = ["Here's my take on your tasks:\n"]
+    final_tasks = []
+    has_suggestions = False
+    for ev in evaluations:
+        suggestion = ev.get("suggestion", ev["original"])
+        issues = ev.get("issues", [])
+        feedback = ev.get("feedback", "")
+        effort = ev.get("effort_min", 60)
+        final_tasks.append(suggestion)
+
+        line = f"*{ev['original']}*"
+        if suggestion != ev["original"]:
+            has_suggestions = True
+            line += f"\n  → _{suggestion}_"
+        if issues:
+            line += f"\n  ⚠️ {', '.join(issues)}"
+        line += f"\n  {feedback} (~{effort}min)"
+        feedback_lines.append(line)
+
+    feedback_msg = "\n\n".join(feedback_lines)
+    if has_suggestions:
+        feedback_msg += "\n\n_I've used the suggested versions. Reply 'keep mine' to use your originals._"
+
+    await update.message.reply_text(feedback_msg, parse_mode="Markdown")
+
+    # Save tasks (use AI suggestions if available)
     db.delete_tasks_for_date(_today())
-    for i, (text, why) in enumerate(zip(tasks, whys), 1):
-        db.add_task(_today(), i, text, why)
+    task_ids = []
+    for i, (task_text, why) in enumerate(zip(final_tasks, whys), 1):
+        task_id = db.add_task(_today(), i, task_text, why)
+        task_ids.append(task_id)
+
+    # Categorize and update tasks
+    categories = ai.categorize_tasks(final_tasks)
+    for task_id, category in zip(task_ids, categories):
+        db.set_task_category(task_id, category)
+
+    # Check for repeat-offender carried tasks
+    carried_tasks = [t for t in db.get_tasks_for_date(_today()) if t["carried_from_id"]]
+    repeat_warnings = []
+    for t in carried_tasks:
+        days_carried = db.count_days_carried(t["id"])
+        if days_carried >= 3:
+            repeat_warnings.append(
+                f"⚠️ *{t['text']}* has been carried {days_carried} days. "
+                "Break it down, do it today, or /kill it."
+            )
+
+    # Schedule check-ins
+    from jacbot.scheduler import schedule_checkins_for_today
+    schedule_checkins_for_today(context.application)
+
     all_tasks = db.get_tasks_for_date(_today())
-    await update.message.reply_text("Locked in! Here's your day:\n\n" + _build_today_message(all_tasks) + "\n\nI'll check in with you throughout the day. Go get it. 💪", parse_mode="Markdown")
+    final_msg = "Locked in! Here's your day:\n\n" + _build_today_message(all_tasks) + "\n\nGo get it. 💪"
+    await update.message.reply_text(final_msg, parse_mode="Markdown")
+
+    if repeat_warnings:
+        await update.message.reply_text("\n\n".join(repeat_warnings), parse_mode="Markdown")
+
     context.user_data.clear()
     return ConversationHandler.END
 
