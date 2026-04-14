@@ -22,7 +22,7 @@ def _format_task_line(task, index: int) -> str:
 
 def _build_today_message(tasks) -> str:
     if not tasks:
-        return "No tasks yet for today.\n\nUse /add to enter your 3 priorities."
+        return "No tasks yet for today.\n\nUse /add to enter your priorities (1–3 tasks)."
     carried = [t for t in tasks if t["carried_from_id"]]
     fresh = [t for t in tasks if not t["carried_from_id"]]
     lines = [f"*Your priorities for {_today().strftime('%A, %b %d')}*\n"]
@@ -33,7 +33,7 @@ def _build_today_message(tasks) -> str:
         lines.append("")
     if fresh:
         if carried:
-            lines.append("*Today's 3:*")
+            lines.append("*Today's priorities:*")
         for i, t in enumerate(fresh, len(carried) + 1):
             lines.append(_format_task_line(t, i))
     done = sum(1 for t in tasks if t["status"] == "done")
@@ -46,11 +46,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db.set_telegram_id(user.id)
     await update.message.reply_text(
         f"Hey {user.first_name}! I'm Jacbot, your personal executive assistant.\n\n"
-        "Every morning I'll ask for your *3 most important tasks* for the day. "
+        "Every morning I'll ask for your *top priorities* for the day (1–3 tasks). "
         "I'll check in through the day, keep you accountable, and at the end of "
         "each week give you an honest summary of what you shipped.\n\n"
         "/today — see today's tasks\n"
-        "/add — enter your 3 priorities\n"
+        "/add — enter your priorities\n"
         "/done N — mark task N complete\n"
         "/journal — add a journal entry\n"
         "/silent — no nudges today\n"
@@ -69,7 +69,7 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     carried = [t for t in db.get_tasks_for_date(_today()) if t["carried_from_id"]]
-    msg = "What are your *3 most important tasks* for today?\n\n"
+    msg = "What are your *top priorities* for today? Send 1–3 tasks.\n\n"
     if carried:
         msg += f"You have {len(carried)} carried task(s) already — these don't count toward your 3.\n\n"
     msg += "Send them as a numbered list:\n1. Draft proposal for client X\n2. Fix login bug\n3. Call accountant\n\nOr /cancel to bail."
@@ -86,20 +86,27 @@ async def add_receive_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 break
         if line:
             cleaned.append(line)
-    if len(cleaned) < 3:
-        await update.message.reply_text(f"I need exactly 3 tasks — you sent {len(cleaned)}. Try again or /cancel.")
+    if len(cleaned) < 1:
+        await update.message.reply_text("Send at least 1 task, or /cancel.")
         return ADD_TASKS
-    context.user_data["pending_tasks"] = cleaned[:3]
-    await update.message.reply_text("Got it. Want to add a quick *why* for each task?\n\nSend 3 lines (one per task), or type *skip* to lock them in now.", parse_mode="Markdown")
+    tasks = cleaned[:3]
+    context.user_data["pending_tasks"] = tasks
+    n = len(tasks)
+    await update.message.reply_text(
+        f"Got it — {n} task{'s' if n > 1 else ''}. Want to add a quick *why* for each?\n\n"
+        "Send one reason per line, or type *skip* to lock them in now.",
+        parse_mode="Markdown"
+    )
     return ADD_WHY
 
 async def add_receive_why(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     raw = update.message.text.strip()
     tasks = context.user_data.get("pending_tasks", [])
-    whys: list[str | None] = [None, None, None]
+    n = len(tasks)
+    whys: list[str | None] = [None] * n
     if raw.lower() != "skip":
         why_lines = [l.strip() for l in raw.splitlines() if l.strip()]
-        for i in range(min(3, len(why_lines))):
+        for i in range(min(n, len(why_lines))):
             whys[i] = why_lines[i] or None
 
     # AI evaluation — runs before saving so we can show feedback
@@ -161,7 +168,10 @@ async def add_receive_why(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     schedule_checkins_for_today(context.application)
 
     all_tasks = db.get_tasks_for_date(_today())
+    fresh_count = sum(1 for t in all_tasks if not t["carried_from_id"])
     final_msg = "Locked in! Here's your day:\n\n" + _build_today_message(all_tasks) + "\n\nGo get it. 💪"
+    if fresh_count < 3:
+        final_msg += f"\n\n_You have {fresh_count}/3 priorities set. Use /add to add more — I'll remind you at 8am if you're still under 3._"
     await update.message.reply_text(final_msg, parse_mode="Markdown")
 
     if repeat_warnings:

@@ -38,6 +38,10 @@ def setup(app) -> AsyncIOScheduler:
     _scheduler.add_job(evening_rollover, CronTrigger(hour=eh, minute=em, timezone=tz),
                        args=[app], name="evening_rollover", replace_existing=True)
 
+    # 8am deadline check — firm reminder if still <3 fresh tasks by 8am
+    _scheduler.add_job(eight_am_task_check, CronTrigger(hour=8, minute=0, timezone=tz),
+                       args=[app], name="eight_am_task_check", replace_existing=True)
+
     # Weekly report — Sunday at configured time
     _scheduler.add_job(
         _run_weekly_report, CronTrigger(day_of_week="sun", hour=rh, minute=rm, timezone=tz),
@@ -84,6 +88,27 @@ async def morning_nudge(app) -> None:
         f"Good morning! ☀️\n\nYou have {fresh_count}/3 priorities set for today.{note}\n\n"
         "Use /add to lock in your 3 most important tasks.")
     logger.info("Morning nudge sent (fresh=%d)", fresh_count)
+
+
+async def eight_am_task_check(app) -> None:
+    """8am deadline: warn firmly if still <3 fresh tasks set."""
+    today = date.today()
+    all_tasks = db.get_tasks_for_date(today)
+    fresh_count = sum(1 for t in all_tasks if not t["carried_from_id"])
+    if fresh_count >= 3:
+        return
+    user = db.get_user()
+    if not user or not user["telegram_id"]:
+        return
+    remaining = 3 - fresh_count
+    carried = [t for t in all_tasks if t["carried_from_id"]]
+    note = (f"\n\nYou have {len(carried)} carried task(s) from yesterday — "
+            "those don't count toward your 3.") if carried else ""
+    await _send(app, user["telegram_id"],
+        f"⏰ *8am check* — you only have {fresh_count}/3 priorities set for today.{note}\n\n"
+        f"Add {remaining} more task{'s' if remaining > 1 else ''} with /add. "
+        "Let's get the day locked in!")
+    logger.info("8am task check sent (fresh=%d)", fresh_count)
 
 
 async def evening_rollover(app) -> None:
