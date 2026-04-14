@@ -37,7 +37,8 @@ pip install -r requirements.txt
 Create a `.env` file:
 
 ```
-TELEGRAM_TOKEN=...                                  # from @BotFather
+TELEGRAM_BOT_TOKEN=...                              # from @BotFather
+TELEGRAM_ALLOWED_USER_ID=123456789                  # find via @userinfobot
 
 # Ollama — light tasks (task eval, categorization)
 OLLAMA_MAC_URL=http://localhost:11434
@@ -47,10 +48,11 @@ OLLAMA_MAC_MODEL=qwen3:14b
 OLLAMA_DESKTOP_URL=http://192.168.50.206:11434
 OLLAMA_DESKTOP_MODEL=deepseek-r1:14b
 
-# Optional overrides
-TIMEZONE=America/New_York
-MORNING_TIME=07:00
-EVENING_TIME=20:00
+# Scheduler (optional)
+TIMEZONE=America/Toronto
+DAILY_TASK_HOUR=7                                   # morning nudge time
+DAILY_TASK_MINUTE=0
+EVENING_TIME=20:00                                  # evening rollover
 REPORT_TIME=18:00                                   # Sunday weekly report time
 ```
 

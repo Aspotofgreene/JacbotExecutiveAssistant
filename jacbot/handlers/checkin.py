@@ -8,13 +8,16 @@ from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from jacbot import db
+from jacbot import config, db
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_checkin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if update.effective_user and update.effective_user.id != config.TELEGRAM_ALLOWED_USER_ID:
+        await query.answer("Not authorized.", show_alert=True)
+        return
     await query.answer()
 
     parts = query.data.split("_", 2)

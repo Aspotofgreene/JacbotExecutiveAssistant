@@ -33,44 +33,48 @@ def main() -> None:
 
     app = (
         Application.builder()
-        .token(config.TELEGRAM_TOKEN)
+        .token(config.TELEGRAM_BOT_TOKEN)
         .post_init(post_init)
         .build()
     )
 
-    # Simple commands
-    app.add_handler(CommandHandler("start",  cmd_start))
-    app.add_handler(CommandHandler("hello",  cmd_hello))
-    app.add_handler(CommandHandler("today",  cmd_today))
-    app.add_handler(CommandHandler("done",   cmd_done))
-    app.add_handler(CommandHandler("kill",   cmd_kill))
-    app.add_handler(CommandHandler("silent", cmd_silent))
-    app.add_handler(CommandHandler("stats",  cmd_stats))
-    app.add_handler(CommandHandler("report", cmd_report))
+    # Single-user bot — reject everything from other Telegram accounts
+    allowed = filters.User(user_id=config.TELEGRAM_ALLOWED_USER_ID)
+    text_from_owner = filters.TEXT & ~filters.COMMAND & allowed
 
-    # Inline button callbacks
+    # Simple commands
+    app.add_handler(CommandHandler("start",  cmd_start,  filters=allowed))
+    app.add_handler(CommandHandler("hello",  cmd_hello,  filters=allowed))
+    app.add_handler(CommandHandler("today",  cmd_today,  filters=allowed))
+    app.add_handler(CommandHandler("done",   cmd_done,   filters=allowed))
+    app.add_handler(CommandHandler("kill",   cmd_kill,   filters=allowed))
+    app.add_handler(CommandHandler("silent", cmd_silent, filters=allowed))
+    app.add_handler(CommandHandler("stats",  cmd_stats,  filters=allowed))
+    app.add_handler(CommandHandler("report", cmd_report, filters=allowed))
+
+    # Inline button callbacks (checked per-update inside the handler)
     app.add_handler(CallbackQueryHandler(handle_checkin_callback, pattern=r"^ci_"))
 
     # /add conversation
     app.add_handler(ConversationHandler(
-        entry_points=[CommandHandler("add", cmd_add)],
+        entry_points=[CommandHandler("add", cmd_add, filters=allowed)],
         states={
-            ADD_TASKS: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_receive_tasks)],
-            ADD_WHY:   [MessageHandler(filters.TEXT & ~filters.COMMAND, add_receive_why)],
+            ADD_TASKS: [MessageHandler(text_from_owner, add_receive_tasks)],
+            ADD_WHY:   [MessageHandler(text_from_owner, add_receive_why)],
         },
-        fallbacks=[CommandHandler("cancel", add_cancel)],
+        fallbacks=[CommandHandler("cancel", add_cancel, filters=allowed)],
     ))
 
     # /journal conversation
     app.add_handler(ConversationHandler(
-        entry_points=[CommandHandler("journal", cmd_journal)],
+        entry_points=[CommandHandler("journal", cmd_journal, filters=allowed)],
         states={
-            JOURNAL_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, journal_receive_text)],
+            JOURNAL_TEXT: [MessageHandler(text_from_owner, journal_receive_text)],
         },
-        fallbacks=[CommandHandler("cancel", journal_cancel)],
+        fallbacks=[CommandHandler("cancel", journal_cancel, filters=allowed)],
     ))
 
-    logger.info("Jacbot starting…")
+    logger.info("Jacbot starting… (allowed user_id=%d)", config.TELEGRAM_ALLOWED_USER_ID)
     app.run_polling(drop_pending_updates=True)
 
 

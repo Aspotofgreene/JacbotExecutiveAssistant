@@ -26,7 +26,7 @@ def setup(app) -> AsyncIOScheduler:
         logger.warning("Invalid TIMEZONE %r, using America/New_York", config.TIMEZONE)
         tz = ZoneInfo("America/New_York")
 
-    mh, mm = _parse_time(config.MORNING_TIME, 7, 0)
+    mh, mm = config.DAILY_TASK_HOUR, config.DAILY_TASK_MINUTE
     eh, em = _parse_time(config.EVENING_TIME, 20, 0)
 
     _scheduler = AsyncIOScheduler(timezone=tz)

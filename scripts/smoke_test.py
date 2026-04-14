@@ -26,7 +26,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # Set dummy env vars BEFORE importing jacbot.config so _require() passes
-os.environ.setdefault("TELEGRAM_TOKEN", "smoke-test-token")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "smoke-test-token")
+os.environ.setdefault("TELEGRAM_ALLOWED_USER_ID", "0")
 os.environ.setdefault("OLLAMA_MAC_URL", "http://localhost:11434")
 os.environ.setdefault("OLLAMA_MAC_MODEL", "qwen3:14b")
 os.environ.setdefault("OLLAMA_DESKTOP_URL", "http://localhost:11434")
