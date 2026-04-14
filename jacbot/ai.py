@@ -1,37 +1,102 @@
 """
-AI helpers for Jacbot using the Anthropic SDK.
+AI helpers for Jacbot — backed by local Ollama endpoints.
 
-- evaluate_tasks: reviews 3 tasks on entry (clarity, scope, phrasing)
-- categorize_tasks: assigns a theme category to each task
-- generate_weekly_report: full weekly summary
-- generate_monthly_report: monthly trends
-- generate_yearly_report: narrative yearly summary
+Routing:
+  - Light tasks (evaluate_tasks, categorize_tasks) → Mac mini / qwen3
+  - Heavy tasks (weekly/monthly/yearly reports)    → Desktop GPU / deepseek-r1
+
+Ollama exposes an OpenAI-compatible API at /v1, so we use the `openai` SDK
+pointed at two different base_urls. No API key is required but the SDK
+demands a non-empty string.
+
+Local reasoning models (deepseek-r1, qwen3) emit <think>…</think> blocks —
+we strip those before returning. JSON parsing is forgiving of code fences.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date
 
-import anthropic
+from openai import OpenAI
 
 from jacbot import config
 
 logger = logging.getLogger(__name__)
 
-_client: anthropic.Anthropic | None = None
+_light_client: OpenAI | None = None
+_heavy_client: OpenAI | None = None
 
 
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    return _client
+def _base_url(root: str) -> str:
+    root = root.rstrip("/")
+    return root if root.endswith("/v1") else root + "/v1"
+
+
+def _get_light_client() -> OpenAI:
+    global _light_client
+    if _light_client is None:
+        _light_client = OpenAI(base_url=_base_url(config.OLLAMA_MAC_URL),
+                               api_key="ollama")
+    return _light_client
+
+
+def _get_heavy_client() -> OpenAI:
+    global _heavy_client
+    if _heavy_client is None:
+        _heavy_client = OpenAI(base_url=_base_url(config.OLLAMA_DESKTOP_URL),
+                               api_key="ollama")
+    return _heavy_client
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Task evaluation (Haiku — fast, cheap)
+# Output cleaning
+# ─────────────────────────────────────────────────────────────────────────────
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+
+
+def _strip_thinking(text: str) -> str:
+    """Remove <think>…</think> reasoning blocks."""
+    return _THINK_RE.sub("", text).strip()
+
+
+def _extract_json(text: str):
+    """Forgiving JSON extraction: handles fenced blocks and leading/trailing text."""
+    text = _strip_thinking(text)
+
+    # 1. direct parse
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # 2. fenced ```json … ```
+    m = _FENCE_RE.search(text)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except Exception:
+            pass
+
+    # 3. first [ … last ] or first { … last }
+    for opener, closer in (("[", "]"), ("{", "}")):
+        start = text.find(opener)
+        end = text.rfind(closer)
+        if start != -1 and end > start:
+            try:
+                return json.loads(text[start:end + 1])
+            except Exception:
+                continue
+
+    raise ValueError(f"could not parse JSON from model output: {text[:200]!r}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task evaluation (Mac mini — qwen3)
 # ─────────────────────────────────────────────────────────────────────────────
 
 EVAL_SYSTEM = """\
@@ -51,14 +116,11 @@ Issue types to check:
   - "no_action_verb": doesn't start with an action word
   - "missing_context": needs who/what/where to be actionable
 
-Be concise and encouraging. Return ONLY valid JSON, no markdown."""
+Be concise and encouraging. Return ONLY valid JSON, no markdown, no commentary."""
 
 
 def evaluate_tasks(tasks: list[str], whys: list[str | None]) -> list[dict]:
-    """
-    Evaluate 3 tasks for clarity and scope.
-    Returns list of dicts with: original, issues, suggestion, effort_min, feedback
-    """
+    """Evaluate 3 tasks for clarity and scope (Mac mini / qwen3)."""
     task_lines = []
     for i, (task, why) in enumerate(zip(tasks, whys), 1):
         line = f"{i}. {task}"
@@ -69,16 +131,20 @@ def evaluate_tasks(tasks: list[str], whys: list[str | None]) -> list[dict]:
     prompt = "Evaluate these 3 tasks:\n\n" + "\n".join(task_lines)
 
     try:
-        client = _get_client()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            system=EVAL_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
+        client = _get_light_client()
+        response = client.chat.completions.create(
+            model=config.OLLAMA_MAC_MODEL,
+            messages=[
+                {"role": "system", "content": EVAL_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
         )
-        result = json.loads(response.content[0].text)
+        raw = response.choices[0].message.content or ""
+        result = _extract_json(raw)
         if isinstance(result, list) and len(result) == 3:
             return result
+        logger.warning("Task eval returned wrong shape: %r", result)
     except Exception as e:
         logger.error("Task evaluation failed: %s", e)
 
@@ -88,7 +154,7 @@ def evaluate_tasks(tasks: list[str], whys: list[str | None]) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Categorization (Haiku)
+# Categorization (Mac mini — qwen3)
 # ─────────────────────────────────────────────────────────────────────────────
 
 CATEGORIES = [
@@ -99,23 +165,26 @@ CATEGORIES = [
 CATEGORY_SYSTEM = f"""\
 Categorize tasks into one of these categories: {', '.join(CATEGORIES)}.
 Return a JSON array of category strings, one per task, in the same order.
-Return ONLY valid JSON, no markdown."""
+Return ONLY valid JSON, no markdown, no commentary."""
 
 
 def categorize_tasks(task_texts: list[str]) -> list[str]:
-    """Return a category string for each task."""
+    """Return a category string for each task (Mac mini / qwen3)."""
     if not task_texts:
         return []
     prompt = "Categorize these tasks:\n" + "\n".join(f"- {t}" for t in task_texts)
     try:
-        client = _get_client()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=256,
-            system=CATEGORY_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
+        client = _get_light_client()
+        response = client.chat.completions.create(
+            model=config.OLLAMA_MAC_MODEL,
+            messages=[
+                {"role": "system", "content": CATEGORY_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
         )
-        result = json.loads(response.content[0].text)
+        raw = response.choices[0].message.content or ""
+        result = _extract_json(raw)
         if isinstance(result, list):
             return [str(c) for c in result[:len(task_texts)]]
     except Exception as e:
@@ -124,7 +193,7 @@ def categorize_tasks(task_texts: list[str]) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Reports (Sonnet — deep analysis)
+# Reports (Desktop GPU — deepseek-r1)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_task_summary(tasks: list) -> str:
@@ -141,6 +210,17 @@ def _build_journal_summary(entries: list) -> str:
     if not entries:
         return "No journal entries."
     return "\n".join(f"- {e['text'][:200]}" for e in entries)
+
+
+def _heavy_chat(prompt: str, max_tokens: int) -> str:
+    client = _get_heavy_client()
+    response = client.chat.completions.create(
+        model=config.OLLAMA_DESKTOP_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+        temperature=0.6,
+    )
+    return _strip_thinking(response.choices[0].message.content or "")
 
 
 def generate_weekly_report(
@@ -179,13 +259,7 @@ Write a weekly summary with these sections:
 Be direct, honest, and encouraging. No fluff. Max 300 words."""
 
     try:
-        client = _get_client()
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return response.content[0].text
+        return _heavy_chat(prompt, max_tokens=1024)
     except Exception as e:
         logger.error("Weekly report failed: %s", e)
         return f"Weekly report generation failed: {e}"
@@ -219,13 +293,7 @@ Write a monthly report with:
 Be analytical and honest. Max 400 words."""
 
     try:
-        client = _get_client()
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1500,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return response.content[0].text
+        return _heavy_chat(prompt, max_tokens=1500)
     except Exception as e:
         logger.error("Monthly report failed: %s", e)
         return f"Monthly report generation failed: {e}"
@@ -236,7 +304,6 @@ def generate_yearly_report(tasks: list, journal_entries: list, year: int) -> str
     done = sum(1 for t in fresh_tasks if t["status"] == "done")
     total = len(fresh_tasks)
 
-    # Category breakdown
     from collections import Counter
     categories = Counter(t["ai_category"] or "Uncategorized" for t in fresh_tasks)
     cat_summary = "\n".join(f"  {cat}: {count}" for cat, count in categories.most_common())
@@ -263,13 +330,7 @@ Write an inspiring but honest yearly narrative with:
 Be thoughtful, narrative, and personal. Max 500 words."""
 
     try:
-        client = _get_client()
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return response.content[0].text
+        return _heavy_chat(prompt, max_tokens=2000)
     except Exception as e:
         logger.error("Yearly report failed: %s", e)
         return f"Yearly report generation failed: {e}"

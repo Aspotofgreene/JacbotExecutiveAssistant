@@ -24,7 +24,7 @@ See [`PLANNING.md`](./PLANNING.md) for the full spec.
 - [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) 21.6 (async)
 - APScheduler (runs inside the bot's event loop via `post_init`)
 - SQLite
-- Anthropic SDK (Haiku for task eval & categorization, Sonnet for reports)
+- Local LLMs via Ollama (OpenAI-compatible API) — light tasks on one host, heavy tasks on another
 
 ## Setup
 
@@ -37,12 +37,28 @@ pip install -r requirements.txt
 Create a `.env` file:
 
 ```
-TELEGRAM_TOKEN=...          # from @BotFather
-ANTHROPIC_API_KEY=...       # from console.anthropic.com
-TIMEZONE=America/New_York   # optional; default shown
-MORNING_TIME=07:00          # optional
-EVENING_TIME=20:00          # optional
-REPORT_TIME=18:00           # optional; Sunday weekly report time
+TELEGRAM_TOKEN=...                                  # from @BotFather
+
+# Ollama — light tasks (task eval, categorization)
+OLLAMA_MAC_URL=http://localhost:11434
+OLLAMA_MAC_MODEL=qwen3:14b
+
+# Ollama — heavy tasks (weekly/monthly/yearly reports)
+OLLAMA_DESKTOP_URL=http://192.168.50.206:11434
+OLLAMA_DESKTOP_MODEL=deepseek-r1:14b
+
+# Optional overrides
+TIMEZONE=America/New_York
+MORNING_TIME=07:00
+EVENING_TIME=20:00
+REPORT_TIME=18:00                                   # Sunday weekly report time
+```
+
+Make sure both Ollama hosts have the models pulled:
+
+```bash
+ollama pull qwen3:14b          # on the light host
+ollama pull deepseek-r1:14b    # on the heavy host
 ```
 
 ## Run

@@ -27,7 +27,10 @@ from pathlib import Path
 
 # Set dummy env vars BEFORE importing jacbot.config so _require() passes
 os.environ.setdefault("TELEGRAM_TOKEN", "smoke-test-token")
-os.environ.setdefault("ANTHROPIC_API_KEY", "smoke-test-key")
+os.environ.setdefault("OLLAMA_MAC_URL", "http://localhost:11434")
+os.environ.setdefault("OLLAMA_MAC_MODEL", "qwen3:14b")
+os.environ.setdefault("OLLAMA_DESKTOP_URL", "http://localhost:11434")
+os.environ.setdefault("OLLAMA_DESKTOP_MODEL", "qwen3:14b")
 
 # Point DB at a throwaway file
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
