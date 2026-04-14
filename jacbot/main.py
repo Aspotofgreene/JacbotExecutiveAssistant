@@ -1,5 +1,6 @@
 """Jacbot Executive Assistant — entry point. Run with: python -m jacbot.main"""
 
+import asyncio
 import logging
 
 from telegram.ext import (
@@ -29,6 +30,14 @@ async def post_init(app: Application) -> None:
 
 
 def main() -> None:
+    # Python 3.14 removed implicit event-loop creation; python-telegram-bot
+    # 21.6's run_polling() calls asyncio.get_event_loop() expecting one to
+    # exist. Create it here so the call succeeds.
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+
     db.init_db()
 
     app = (
