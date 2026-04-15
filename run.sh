@@ -5,8 +5,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [ -d "venv" ]; then
+if [ -d ".venv" ]; then
+    source .venv/bin/activate
+elif [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-exec python -m jacbot.main
+exec python3 -m jacbot.main
