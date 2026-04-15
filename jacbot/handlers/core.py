@@ -22,7 +22,7 @@ def _format_task_line(task, index: int) -> str:
 
 def _build_today_message(tasks) -> str:
     if not tasks:
-        return "No tasks yet for today.\n\nUse /add to enter your priorities (1–3 tasks)."
+        return "No tasks yet for today.\n\nUse /add to enter your priorities (aim for at least 3)."
     carried = [t for t in tasks if t["carried_from_id"]]
     fresh = [t for t in tasks if not t["carried_from_id"]]
     lines = [f"*Your priorities for {_today().strftime('%A, %b %d')}*\n"]
@@ -46,7 +46,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db.set_telegram_id(user.id)
     await update.message.reply_text(
         f"Hey {user.first_name}! I'm Jacbot, your personal executive assistant.\n\n"
-        "Every morning I'll ask for your *top priorities* for the day (1–3 tasks). "
+        "Every morning I'll ask for your *top priorities* for the day — aim for at least 3. "
         "I'll check in through the day, keep you accountable, and at the end of "
         "each week give you an honest summary of what you shipped.\n\n"
         "/today — see today's tasks\n"
@@ -71,62 +71,38 @@ async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     all_tasks = db.get_tasks_for_date(_today())
     fresh = [t for t in all_tasks if not t["carried_from_id"]]
     carried = [t for t in all_tasks if t["carried_from_id"]]
-    slots = 3 - len(fresh)
-
-    if slots <= 0:
-        await update.message.reply_text(
-            "You already have 3 priorities set for today!\n\n" +
-            _build_today_message(all_tasks) +
-            "\n\nUse /kill N to remove one if you need to swap it out.",
-            parse_mode="Markdown"
-        )
-        return ConversationHandler.END
 
     msg = ""
     if fresh:
         msg += "*Already set today:*\n"
         for i, t in enumerate(fresh, 1):
             msg += f"{i}. {t['text']}\n"
-        msg += f"\nYou have *{slots} slot{'s' if slots > 1 else ''}* left. Send up to {slots} more task{'s' if slots > 1 else ''}.\n\n"
+        msg += "\nWhat else do you want to add?\n\n"
     else:
-        msg += f"What are your *top priorities* for today? Send 1–{slots} tasks.\n\n"
+        msg += "What are your *priorities for today*? Aim for at least 3.\n\n"
 
     if carried:
-        msg += f"_{len(carried)} carried task(s) from yesterday — don't count toward your 3._\n\n"
+        msg += f"_{len(carried)} carried task(s) from yesterday — tracked separately._\n\n"
 
     msg += "Send as a numbered list:\n1. Draft proposal for client X\n2. Fix login bug\n\nOr /cancel to bail."
     await update.message.reply_text(msg, parse_mode="Markdown")
     return ADD_TASKS
 
 async def add_receive_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    import re
     lines = [l.strip() for l in update.message.text.strip().splitlines() if l.strip()]
     cleaned = []
     for line in lines:
-        for prefix in ["1.", "2.", "3.", "1)", "2)", "3)", "-", "*"]:
-            if line.startswith(prefix):
-                line = line[len(prefix):].strip()
-                break
+        # Strip any leading number prefix (1. 2) 10. etc) or bullet (- *)
+        line = re.sub(r"^\d+[.)]\s*", "", line).lstrip("-* ").strip()
         if line:
             cleaned.append(line)
     if len(cleaned) < 1:
         await update.message.reply_text("Send at least 1 task, or /cancel.")
         return ADD_TASKS
 
-    # Only fill the remaining slots — never overwrite existing fresh tasks
-    fresh_existing = [t for t in db.get_tasks_for_date(_today()) if not t["carried_from_id"]]
-    slots = 3 - len(fresh_existing)
-    if slots <= 0:
-        await update.message.reply_text("You already have 3 tasks set. Use /kill N to remove one first.")
-        return ConversationHandler.END
-
-    tasks = cleaned[:slots]
-    context.user_data["pending_tasks"] = tasks
-    n = len(tasks)
-    if len(cleaned) > slots:
-        await update.message.reply_text(
-            f"You only had {slots} slot{'s' if slots > 1 else ''} left — I've taken the first {slots}.",
-            parse_mode="Markdown"
-        )
+    context.user_data["pending_tasks"] = cleaned
+    n = len(cleaned)
     await update.message.reply_text(
         f"Got it — {n} task{'s' if n > 1 else ''}. Want to add a quick *why* for each?\n\n"
         "Send one reason per line, or type *skip* to lock them in now.",
@@ -207,7 +183,8 @@ async def add_receive_why(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     fresh_count = sum(1 for t in all_tasks if not t["carried_from_id"])
     final_msg = "Locked in! Here's your day:\n\n" + _build_today_message(all_tasks) + "\n\nGo get it. 💪"
     if fresh_count < 3:
-        final_msg += f"\n\n_You have {fresh_count}/3 priorities set. Use /add to add more — I'll remind you at 8am if you're still under 3._"
+        needed = 3 - fresh_count
+        final_msg += f"\n\n_You're {needed} goal{'s' if needed > 1 else ''} short of your minimum 3. Use /add to keep going — I'll remind you at 8am if you're still under._"
     await update.message.reply_text(final_msg, parse_mode="Markdown")
 
     if repeat_warnings:
