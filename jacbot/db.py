@@ -23,7 +23,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS tasks (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 date                TEXT    NOT NULL,
-                position            INTEGER NOT NULL CHECK (position BETWEEN 1 AND 3),
+                position            INTEGER NOT NULL,
                 text                TEXT    NOT NULL,
                 why                 TEXT,
                 status              TEXT    NOT NULL DEFAULT 'pending'
@@ -82,6 +82,40 @@ def init_db() -> None:
             INSERT OR IGNORE INTO users (id) VALUES (1);
             INSERT OR IGNORE INTO settings (id) VALUES (1);
         """)
+        _migrate_remove_position_check(conn)
+
+def _migrate_remove_position_check(conn) -> None:
+    """Drop the CHECK (position BETWEEN 1 AND 3) constraint if it still exists."""
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'").fetchone()
+    if not row or "BETWEEN 1 AND 3" not in row["sql"]:
+        return
+    conn.executescript("""
+        PRAGMA foreign_keys = OFF;
+
+        CREATE TABLE tasks_new (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            date                TEXT    NOT NULL,
+            position            INTEGER NOT NULL,
+            text                TEXT    NOT NULL,
+            why                 TEXT,
+            status              TEXT    NOT NULL DEFAULT 'pending'
+                                CHECK (status IN ('pending','done','missed','carried','killed')),
+            carried_from_id     INTEGER REFERENCES tasks_new(id),
+            ai_category         TEXT,
+            ai_effort_min       INTEGER,
+            next_checkin_at     TEXT,
+            checkin_count       INTEGER NOT NULL DEFAULT 0,
+            created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+            completed_at        TEXT,
+            killed_reason       TEXT
+        );
+
+        INSERT INTO tasks_new SELECT * FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+
+        PRAGMA foreign_keys = ON;
+    """)
 
 @contextmanager
 def get_conn():
