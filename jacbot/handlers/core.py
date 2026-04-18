@@ -65,7 +65,18 @@ async def cmd_hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tasks = db.get_tasks_for_date(_today())
-    await update.message.reply_text(_build_today_message(tasks), parse_mode="Markdown")
+    msg = _build_today_message(tasks)
+    if tasks:
+        msg += (
+            "\n\n*Actions:*\n"
+            "`/done N` — mark task N complete\n"
+            "`/kill N` — remove task N\n"
+            "`/add` — add more tasks\n"
+            "`/silent` — pause nudges for today\n\n"
+            "_Check-in buttons (sent automatically):_\n"
+            "_✅ Done · ⏳ In progress · 🚫 Blocked · 💤 Snooze 30m · 🔁 Reschedule_"
+        )
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     all_tasks = db.get_tasks_for_date(_today())

@@ -35,8 +35,10 @@ def setup(app) -> AsyncIOScheduler:
 
     _scheduler.add_job(morning_nudge, CronTrigger(hour=mh, minute=mm, timezone=tz),
                        args=[app], name="morning_nudge", replace_existing=True)
+    # misfire_grace_time=3600: if bot restarts within 1hr of rollover time, still runs it
     _scheduler.add_job(evening_rollover, CronTrigger(hour=eh, minute=em, timezone=tz),
-                       args=[app], name="evening_rollover", replace_existing=True)
+                       args=[app], name="evening_rollover", replace_existing=True,
+                       misfire_grace_time=3600)
 
     # 8am deadline check — firm reminder if still <3 fresh tasks by 8am
     _scheduler.add_job(eight_am_task_check, CronTrigger(hour=8, minute=0, timezone=tz),
