@@ -80,3 +80,8 @@ async def handle_checkin_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text(
             f"🔁 *{task['text']}* — moving it.\n\nWhy is it being rescheduled? (Short note.)",
             parse_mode="Markdown")
+
+    elif action == "kill":
+        db.kill_task(task["id"], "Removed via /today")
+        await query.edit_message_text(
+            f"💀 *{task['text']}* — removed.", parse_mode="Markdown")

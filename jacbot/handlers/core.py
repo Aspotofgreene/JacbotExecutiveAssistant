@@ -64,19 +64,27 @@ async def cmd_hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Jacbot is alive and watching. Let's get things done.")
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     tasks = db.get_tasks_for_date(_today())
-    msg = _build_today_message(tasks)
-    if tasks:
-        msg += (
-            "\n\n*Actions:*\n"
-            "`/done N` — mark task N complete\n"
-            "`/kill N` — remove task N\n"
-            "`/add` — add more tasks\n"
-            "`/silent` — pause nudges for today\n\n"
-            "_Check-in buttons (sent automatically):_\n"
-            "_✅ Done · ⏳ In progress · 🚫 Blocked · 💤 Snooze 30m · 🔁 Reschedule_"
+
+    # Send the task list
+    await update.message.reply_text(_build_today_message(tasks), parse_mode="Markdown")
+
+    # Send an inline button row for every pending task
+    pending = [t for t in tasks if t["status"] == "pending"]
+    for t in pending:
+        tid = t["id"]
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Done",        callback_data=f"ci_done_{tid}"),
+             InlineKeyboardButton("⏳ In progress", callback_data=f"ci_prog_{tid}")],
+            [InlineKeyboardButton("🚫 Blocked",     callback_data=f"ci_block_{tid}"),
+             InlineKeyboardButton("💤 Snooze 30m",  callback_data=f"ci_snooze_{tid}")],
+            [InlineKeyboardButton("🔁 Reschedule",  callback_data=f"ci_resched_{tid}"),
+             InlineKeyboardButton("💀 Kill",        callback_data=f"ci_kill_{tid}")],
+        ])
+        await update.message.reply_text(
+            f"*{t['text']}*", parse_mode="Markdown", reply_markup=keyboard
         )
-    await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     all_tasks = db.get_tasks_for_date(_today())
