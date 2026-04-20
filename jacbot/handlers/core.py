@@ -52,6 +52,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/today — see today's tasks\n"
         "/add — enter your priorities\n"
         "/done N — mark task N complete\n"
+        "/report — generate a weekly summary (anytime)\n"
         "/journal — add a journal entry\n"
         "/silent — no nudges today\n"
         "/stats — streak & completion rate\n"

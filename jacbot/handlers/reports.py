@@ -17,11 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """On-demand weekly report."""
-    await update.message.reply_text("Generating your weekly report… ⏳")
+    """On-demand weekly summary — covers the last 7 days."""
+    await update.message.reply_text(
+        f"Generating your weekly summary ⏳\n"
+        f"_Covering {( date.today() - timedelta(days=6) ).strftime('%b %d')} → today. This may take a moment…_",
+        parse_mode="Markdown"
+    )
 
     today = date.today()
-    # Last 7 days
     week_start = today - timedelta(days=6)
 
     tasks = db.get_tasks_in_range(week_start, today)
