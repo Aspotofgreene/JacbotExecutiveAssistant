@@ -33,8 +33,8 @@ async def handle_checkin_callback(update: Update, context: ContextTypes.DEFAULT_
     if not task:
         await query.edit_message_text("Task not found.")
         return
-    if task["status"] == "done":
-        await query.edit_message_text(f"✅ *{task['text']}* is already done!", parse_mode="Markdown")
+    if task["status"] in ("done", "killed"):
+        await query.edit_message_text(f"✅ *{task['text']}* is already handled.", parse_mode="Markdown")
         return
 
     if action == "done":

@@ -150,6 +150,12 @@ def add_task(day: date, position: int, text: str, why: str | None = None, carrie
 def mark_task_done(task_id: int) -> None:
     with get_conn() as conn:
         conn.execute("UPDATE tasks SET status = 'done', completed_at = datetime('now') WHERE id = ?", (task_id,))
+        # If this task was already rolled over to tomorrow, remove that copy
+        conn.execute(
+            "UPDATE tasks SET status = 'killed', killed_reason = 'completed after evening rollover' "
+            "WHERE carried_from_id = ? AND status = 'pending'",
+            (task_id,)
+        )
 
 def kill_task(task_id: int, reason: str) -> None:
     with get_conn() as conn:

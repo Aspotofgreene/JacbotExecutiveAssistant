@@ -70,9 +70,9 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Send the task list
     await update.message.reply_text(_build_today_message(tasks), parse_mode="Markdown")
 
-    # Send an inline button row for every pending task
-    pending = [t for t in tasks if t["status"] == "pending"]
-    for t in pending:
+    # Show buttons for pending tasks, and for carried tasks (after evening rollover)
+    actionable = [t for t in tasks if t["status"] in ("pending", "carried")]
+    for t in actionable:
         tid = t["id"]
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ Done",        callback_data=f"ci_done_{tid}"),
