@@ -75,6 +75,25 @@ within the report week; unconfirmed items are flagged.*
 **Bullish forces:** Exceptional Q1 earnings (+27.7%), the sharp oil decline easing inflation fears, a normalized U.S. yield curve, resilient U.S. labor and growth (2.0% Q1 GDP), a building central-bank easing bias, and powerful AI-driven momentum (S&P 500 nine straight weekly gains; Nasdaq +8% on the month).
 **Bearish forces:** Stretched U.S. valuations (fwd P/E ~21), still-elevated headline inflation (US CPI 3.8%, core PCE 3.3%) keeping the Fed on hold, a 10-year yield at 4.45%, Canada's confirmed technical recession and rising unemployment, and an oil/geopolitical truce that could unravel at any moment.
 
+## ETFs in Focus — Tailwinds & Headwinds (educational, not advice)
+Map the week's news to specific ETFs. For each: ticker, direction, and a one-line reason tied to a specific driver in this report. Direction is not a buy/sell call — it flags which holdings this week's drivers happen to favor or pressure.
+
+**🟢 Likely tailwinds (this week's news is supportive):**
+- `QQQ` — Invesco QQQ Trust (Nasdaq-100) — record Nasdaq close (26,972, +8% on the month) on Q1 +27.7% earnings and AI/semiconductor leadership (Section 4, 7).
+- `SMH` — VanEck Semiconductor ETF — semiconductors are the cited earnings/momentum leaders driving the melt-up; the AI capex cycle is the rally's engine (Section 4).
+- `VOO` — Vanguard S&P 500 ETF — the index hit a record 7,580 with nine straight weekly gains, supported by broad-based earnings strength and easing oil (Section 4, 6, 7).
+- `JETS` — U.S. Global Jets ETF (airlines) — WTI/Brent down ~16–17% on the month slashes jet-fuel costs, a direct tailwind for carriers (Section 6).
+- `XLY` — Consumer Discretionary Select Sector SPDR — falling oil eases gasoline/transport costs and disinflation supports consumer spending power into a resilient U.S. labor market (Section 1, 2, 6).
+- `VDY.TO` — Vanguard FTSE Canada High Dividend Yield ETF — falling GoC 10Y (~3.45%, off its ~3.74% high) and a building BoC-cut bias (June 10) support rate-sensitive Canadian dividend payers (Section 3, 5).
+
+**🔴 Likely headwinds (this week's news is a drag):**
+- `XLE` — Energy Select Sector SPDR (U.S. energy) — oil's ~16–17% monthly collapse, the largest since 2020, directly pressures U.S. oil-producer revenues (Section 6).
+- `XEG.TO` — iShares S&P/TSX Capped Energy Index ETF — the same oil reversal hits Canadian producers, compounded by resource-led weakness in Canada's Q1 technical recession (Section 6, 8).
+- `TLT` — iShares 20+ Year Treasury Bond ETF — a UST 10Y at 4.45% with still-elevated headline inflation (CPI 3.8%, core PCE 3.3%) keeps the Fed on hold, capping long-duration bond gains (Section 1, 3, 5).
+- `XLU` — Utilities Select Sector SPDR — defensives tend to lag in a risk-on, AI-led melt-up while elevated long yields compete with bond-proxy sectors (Section 4, 5).
+- `EWC` — iShares MSCI Canada ETF — Canada's confirmed technical recession, 6.9% unemployment, energy-heavy index, and a softening CAD weigh on broad Canadian equity exposure (Section 2, 6, 8).
+- `ZEB.TO` — BMO Equal Weight Banks Index ETF — Canada's technical recession, rising unemployment (6.9%), and softer domestic demand pressure bank credit and loan growth (Section 2, 8).
+
 ## Watchlist Notes (educational, not advice)
 - **Most favorable now:** Large-cap U.S. quality with strong earnings momentum — the AI/semiconductor/cloud/platform complex driving the index, supported by 27.7% earnings growth and easing oil.
 - **Highest upside (higher risk):** AI/semiconductor names and high-beta tech tied to the momentum trade — the biggest beneficiaries of a dovish-pivot narrative, but also the most exposed to any growth or AI disappointment given rich multiples.

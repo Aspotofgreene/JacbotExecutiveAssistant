@@ -127,6 +127,23 @@ within the report week; unconfirmed items are flagged.*
 **Bullish forces:** …
 **Bearish forces:** …
 
+## ETFs in Focus — Tailwinds & Headwinds (educational, not advice)
+Map the week's actual news to specific ETFs. For each, give the **ticker**, the
+**direction** of impact, and a **one-line reason tied to a driver in this report**
+(e.g. "oil's ~16% drop", "10Y back to 4.45%", "+27.7% EPS growth"). Cover both U.S.
+and Canada-listed funds where relevant.
+
+**🟢 Likely tailwinds (this week's news is supportive):**
+- `TICKER` — Name — reason tied to a specific driver above.
+- … (aim for 4-6)
+
+**🔴 Likely headwinds (this week's news is a drag):**
+- `TICKER` — Name — reason tied to a specific driver above.
+- … (aim for 4-6)
+
+Keep it concrete: name the catalyst (which indicator moved, in which direction) and
+why it helps or hurts that ETF's holdings. Note that direction ≠ a buy/sell call.
+
 ## Watchlist Notes (educational, not advice)
 - **Most favorable now:** …
 - **Highest upside (higher risk):** …
@@ -150,4 +167,6 @@ the dominant tension and the top 2-3 risks to watch next week>.
 - Every indicator section has all four parts and a watch level.
 - The scorecard rows are consistent with the section watch levels.
 - The "Bottom Line" bull/bear % is justified by the body, not arbitrary.
+- The "ETFs in Focus" section lists real, correctly-tickered ETFs, each with a reason
+  tied to a driver elsewhere in the report — both a tailwind and a headwind list.
 - A Sources section lists what you actually used. No uncited hard numbers.
